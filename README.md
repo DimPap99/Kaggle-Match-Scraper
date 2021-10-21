@@ -1,2 +1,2 @@
 # Kaggle-Match-Downloader
-A simple python3 script to download matches of various competitions from Kaggle.
+A simple python3 script to scrape matches of various Kaggle competitions.
