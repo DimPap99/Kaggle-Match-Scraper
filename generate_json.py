@@ -38,7 +38,20 @@ def config_init(path):
         print("Detected configuration file...")
         with open(path, 'r') as f:
             conf = json.load(f)
-        return conf
+        
+        return validate_configuration(conf)
     else:
         print("Didnt find the configuration file, will generate an new one...")
         return generate_config(path)
+
+
+
+def validate_configuration(config:dict):
+    if config["THRESHOLDS"]["MAX_REQUESTS"] > 3600:
+        print("Fixed the max request threshold.")
+        config["THRESHOLDS"]["MAX_REQUESTS"] = 3600
+    
+    if config["THRESHOLDS"]["REQUEST_INTERVAL"] < 1:
+        print("Fixed the request interval.")
+        config["THRESHOLDS"]["REQUEST_INTERVAL"] = 1
+    return config
