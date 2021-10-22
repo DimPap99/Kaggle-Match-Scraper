@@ -12,7 +12,7 @@
     },
     "THRESHOLDS": {
         "MAX_REQUESTS": 3600,
-        "MIN_MATCH_SCORE": 1550,
+        "MIN_MATCH_SCORE": 1320,
         "REQUEST_INTERVAL": 1
     },
     "URL": "https://www.kaggle.com/requests/EpisodeService/GetEpisodeReplay",

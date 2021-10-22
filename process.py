@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
 from pandas.core.frame import DataFrame
-import datetime
+import datetime, collections
 import time, requests, json, os, sys
 from Config_Handler import Config_Handler
-
 def filter_AgentEps(episode_agents:DataFrame, episodes:DataFrame, score_threshold):
     #filter the dataframes
     episode_agents = episode_agents[episode_agents.EpisodeId.isin(episodes.index)]
@@ -73,29 +72,59 @@ def saveEpisode(epid, episode_agents_df, config_handler:Config_Handler, episodes
     # request
     re = requests.post(config_handler.url, json = {"EpisodeId": int(epid)})
     match_replay_path = os.path.join(config_handler.get_directory("MATCHES"),'{}.json'.format(epid))
+    match_all_path = os.path.join(config_handler.get_directory("MATCHES"),'all{}.json'.format(epid))
+
     match_info_path = os.path.join(config_handler.get_directory("MATCHES"),'{}_info.json'.format(epid))
     # save replay
     with open(match_replay_path, 'w') as f:
         f.write(re.json()['result']['replay'])
 
+    with open(match_all_path, 'w') as f:
+        f.write(re.json())
     # save match info
     info = create_info_json(epid, episode_agents_df, episodes_df, config_handler)
     with open(match_info_path, 'w') as f:
         json.dump(info, f)
 
-def check_for_new_eps(candidates, sub_to_episodes, matches_dir:str):
+def check_for_new_eps(candidates, subid_epid_pairs, matches_dir:str):
     all_files = []
     for root, dirs, files in os.walk(matches_dir, topdown=False):
         print(root, dirs, files)
         
         all_files.extend(files)
     
-    already_scraped = [int(f.split('.')[0]) for f in all_files 
+    seen_episodes = [int(f.split('.')[0]) for f in all_files 
                         if '.' in f and f.split('.')[0].isdigit() and f.split('.')[1] == 'json']
-    remaining = np.setdiff1d([item for sublist in sub_to_episodes.values() for item in sublist],already_scraped)
+    remaining = np.setdiff1d([item for sublist in subid_epid_pairs.values() for item in sublist],seen_episodes)
+    
     print(f'{len(remaining)} of these {candidates} episodes not yet saved')
-    print('Total of {} games in existing library'.format(len(already_scraped)))
-    return already_scraped, remaining
+    print('Total of {} games in existing library'.format(len(seen_episodes)))
+    return seen_episodes, remaining
+
+    
+    #     if '_info' in file_name:
+    #         continue
+    #     else:
+    #         existing_epids.append(int(file_name.split(".")[0]))
+    # sub = []
+    # for submissio_id, episode_id in subid_epid_pairs.items():
+    # for key in subid_epid_pairs:
+    #     sub.extend(subid_epid_pairs[key])
+    # print(list(set(sub[0:len(sub)//2]).intersection(sub[(len(sub)//2):-1])))
+
+    
+    #print([item for item, count in collections.Counter(sub).items() if count > 1])
+
+    #total_epids
+    # for item in sub_to_episodes:
+    #     print(item)
+    #print(sub_to_episodes)
+    sys.exit(0)
+    remaining = np.setdiff1d([item for sublist in subid_epid_pairs.values() for item in sublist],existing_epids)
+    print(remaining)
+    print(f'{len(remaining)} of these {candidates} episodes not yet saved')
+    print('Total of {} games in existing library'.format(len(existing_epids)))
+    return existing_epids, remaining
 
 
 def start_scraping(episodes, episode_pagents_df, seen, remaining, sub_to_score_top, sub_to_episodes, config_handler:Config_Handler):

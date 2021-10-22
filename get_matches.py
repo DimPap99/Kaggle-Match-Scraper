@@ -1,12 +1,7 @@
 import pandas as pd
 import numpy as np
-import os
-import requests
-import json
-import datetime
-import time
-import glob, sys
-import collections
+import os, sys, collections
+
 from helper import *
 from process import *
 from Config_Handler import Config_Handler
@@ -54,7 +49,6 @@ else:
         max_score_epagents_df = filter_AgentEps(chunk, episodes_df, MIN_SCORE)
         merged_dataframes = pd.merge(left=episodes_df, right=max_score_epagents_df, left_index=True, right_on='EpisodeId') 
         subid_and_score_pairs = pd.Series(merged_dataframes.UpdatedScore.values,index=merged_dataframes.SubmissionId).to_dict()
-        print(subid_and_score_pairs)
         print(f'{len(subid_and_score_pairs)} submissions with score over {MIN_SCORE}')
         
         # Get episodes for these submissions
@@ -62,7 +56,7 @@ else:
         candidates = get_candidate_eps(subid_and_score_pairs, subid_epid_pairs, chunk)
 
         seen_episodes, remaining = check_for_new_eps(candidates, subid_epid_pairs, config_handler.get_directory("MATCHES"))
-        sys.exit(0)
-        start_scraping(episodes_df, chunk, seen_episodes, remaining, subid_epid_pairs, sub_to_episodes, conf_json)
+        
+        start_scraping(episodes_df, chunk, seen_episodes, remaining, subid_and_score_pairs, subid_epid_pairs, config_handler)
         sys.exit(0)
 
