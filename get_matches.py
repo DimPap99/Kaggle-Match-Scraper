@@ -49,5 +49,23 @@ if can_be_loaded(EPISODE_AGENTS_PATH) is True:#If the size of the csv is small w
     candidates = get_candidate_eps(subid_and_score_pairs, subid_epid_pairs=subid_epid_pairs, episode_agents_df=episode_agents_df)
     already_scraped, remaining = check_for_new_eps(candidates)
     start_scraping(already_scraped, remaining)
+else:
+    c_sz = find_df_chunk_sz(EPISODE_AGENTS_PATH)
+    print(c_sz)
+    print(f"Size per dataframe chunk: {c_sz}")
+    for chunk in pd.read_csv(EPISODE_AGENTS_PATH, chunksize=c_sz):
+        max_df = filter_AgentEps(ep_agents_df=chunk, episodes=episodes_df, config=conf_json)
+        max_df = pd.merge(left=episodes_df, right=max_df, left_index=True, right_on='EpisodeId') 
+        sub_to_score_top = pd.Series(max_df.UpdatedScore.values,index=max_df.SubmissionId).to_dict()
+        
 
-print("Will load episode agents...")
+        print(f'{len(sub_to_score_top)} submissions with score over {conf_json["THRESHOLDS"]["MIN_MATCH_SCORE"]}')
+        # Get episodes for these submissions
+        sub_to_episodes = collections.defaultdict(list)
+        candidates = get_candidate_eps(sub_to_score_top=sub_to_score_top, sub_to_episodes=sub_to_episodes, epagents_df=chunk)
+        seen_episodes, remaining = check_for_new_eps(candidates, sub_to_episodes, conf_json)
+        
+        
+        start_scraping(episodes_df, chunk, seen_episodes, remaining, sub_to_score_top, sub_to_episodes, conf_json)
+        
+
