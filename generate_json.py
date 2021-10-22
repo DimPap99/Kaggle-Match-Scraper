@@ -1,5 +1,9 @@
 import json, os
 os.path.dirname(__file__)
+
+
+        
+
 def generate_config(path):
     print(f"Will generate the configurations file in {path}")
     CONFIGURATION = {}
@@ -28,6 +32,7 @@ def generate_config(path):
         "KAGGLE_DATA": "./meta-kaggle/",
         "MATCHES": "./matches"
     }
+    CONFIGURATION["FILTER_EPISODES"] = True 
    
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(CONFIGURATION, f, ensure_ascii=False, indent=4)

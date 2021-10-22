@@ -6,7 +6,7 @@ import time, requests, json, os, sys
 def filter_AgentEps(episode_agents:DataFrame, episodes:DataFrame, config:dict):
     #filter the dataframes
     episode_agents = episode_agents[episode_agents.EpisodeId.isin(episodes.index)]
-    print(f'EpisodeAgents Chunk: {len(episode_agents)} rows after filtering for {config["Competitions_Info"]["TARGET_COMP"]}.')
+    print(f'EpisodeAgents Chunk: {len(episode_agents)} rows after filtering for {config["COMPETITIONS_INFO"]["TARGET_COMP"]}.')
     episode_agents.fillna(0, inplace=True)
     episode_agents = episode_agents.sort_values(by=['Id'], ascending=False)
     # Get top scoring submissions#
@@ -29,9 +29,9 @@ def get_candidate_eps(subid_and_score_pairs:dict, subid_epid_pairs:dict, episode
 
 def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, json_config):
     ct = episodes_df[episodes_df.index == epid]['CreateTime'].values[0]
-    create_seconds = int(time.mktime(datetime.datetime.strptime(ct, "%Y-%m-%d %H:%M:%S").timetuple()))
+    create_seconds = int(time.mktime(datetime.datetime.strptime(ct, "%Y/%m/%d %H:%M:%S").timetuple()))
     es = episodes_df[episodes_df.index == epid]['EndTime'].values[0]
-    end_seconds = int(time.mktime(datetime.datetime.strptime(es, "%Y-%m-%d %H:%M:%S").timetuple()))
+    end_seconds = int(time.mktime(datetime.datetime.strptime(es, "%Y/%m/%d %H:%M:%S").timetuple()))
 
     agents = []
     for index, row in epagents_df[epagents_df['EpisodeId'] == epid].sort_values(by=['Index']).iterrows():
