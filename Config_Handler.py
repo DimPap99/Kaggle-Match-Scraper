@@ -7,8 +7,11 @@ class Config_Handler(object):
         self.config_path = json_path
         self.config = self.config_init()
         self.validate()
-        self.target_competition = self.config["COMPETITIONS_INFO"]["TARGET_COMP"]
+        self.target_competition_str = self.config["COMPETITIONS_INFO"]["TARGET_COMP"]
         self.url = self.config["URL"]
+        self.filter = self.config["FILTER_EPISODES"]
+        self.target_competition_id = self.get_competition_id(self.target_competition_str)
+
 
     def get_competition_id(self, competition):
         if competition in self.config["COMPETITIONS_INFO"]["COMP_IDS"].keys():

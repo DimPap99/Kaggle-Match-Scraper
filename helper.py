@@ -3,6 +3,8 @@ from pandas.core.frame import DataFrame
 import pandas as pd
 import sys
 
+from Config_Handler import Config_Handler
+
 GB_1 = 10**9 # bytes around 0.93 gb
 def df_row_size(file_path) -> int:
     df = pd.read_csv(file_path, nrows=1)
@@ -39,14 +41,13 @@ def find_df_chunk_sz(file, with_curr_mem=False) -> int:
 
 
 
-def filter_episodes(original_path:str, new_path:str, config_file:dict) -> None:
-    target_competition_str = config_file["COMPETITIONS_INFO"]["TARGET_COMP"]
+def filter_episodes(original_path:str, new_path:str, competition_id:int) -> None:
     # Load episodes and filter them
     episodes_df = load_episodes(original_path)
     print(f"Will filter {original_path} based on the CompetitionId...")
     print(f"{original_path}: {len(episodes_df)} rows before filtering.")
-    episodes_df = episodes_df[episodes_df.CompetitionId == config_file["COMPETITIONS_INFO"]["COMP_IDS"][target_competition_str]] 
-    print(f"Filtering finished...\n{original_path}: {len(episodes_df)} rows after filtering for {target_competition_str}.")
+    episodes_df = episodes_df[episodes_df.CompetitionId == competition_id] 
+    print(f"Filtering finished...\n{original_path}: {len(episodes_df)} rows after filtering for {competition_id}.")
     print(f"Reseting the index on the Id column...")
     episodes_df = episodes_df.set_index(['Id'])
     episodes_df.to_csv(new_path)

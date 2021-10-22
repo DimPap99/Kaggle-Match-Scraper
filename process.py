@@ -3,17 +3,19 @@ import pandas as pd
 from pandas.core.frame import DataFrame
 import datetime
 import time, requests, json, os, sys
-def filter_AgentEps(episode_agents:DataFrame, episodes:DataFrame, config:dict):
+from Config_Handler import Config_Handler
+
+def filter_AgentEps(episode_agents:DataFrame, episodes:DataFrame, score_threshold):
     #filter the dataframes
     episode_agents = episode_agents[episode_agents.EpisodeId.isin(episodes.index)]
-    print(f'EpisodeAgents Chunk: {len(episode_agents)} rows after filtering for {config["COMPETITIONS_INFO"]["TARGET_COMP"]}.')
+    print(f'Current EpisodeAgents Chunk has: {len(episode_agents)} rows after filtering for the target conpetition.')
     episode_agents.fillna(0, inplace=True)
     episode_agents = episode_agents.sort_values(by=['Id'], ascending=False)
     # Get top scoring submissions#
-    max_df = (episode_agents.sort_values(by=['EpisodeId'], ascending=False).groupby('SubmissionId').head(1).drop_duplicates().reset_index(drop=True))
-    max_df = max_df[max_df.UpdatedScore>=config["THRESHOLDS"]["MIN_MATCH_SCORE"]]
-    print(f'EpisodeAgents Chunk: {len(episode_agents)} rows with score over {config["THRESHOLDS"]["MIN_MATCH_SCORE"]} .')
-    return max_df
+    max_episode_agents = (episode_agents.sort_values(by=['EpisodeId'], ascending=False).groupby('SubmissionId').head(1).drop_duplicates().reset_index(drop=True))
+    max_episode_agents = max_episode_agents[max_episode_agents.UpdatedScore>=score_threshold]
+    print(f'Current EpisodeAgents Chunk has: {len(max_episode_agents)} rows with score over {score_threshold} .')
+    return max_episode_agents
 
 
 def get_candidate_eps(subid_and_score_pairs:dict, subid_epid_pairs:dict, episode_agents_df:DataFrame):
@@ -27,7 +29,7 @@ def get_candidate_eps(subid_and_score_pairs:dict, subid_epid_pairs:dict, episode
     return candidates
 
 
-def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, json_config):
+def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, config_handler:Config_Handler):
     ct = episodes_df[episodes_df.index == epid]['CreateTime'].values[0]
     create_seconds = int(time.mktime(datetime.datetime.strptime(ct, "%Y/%m/%d %H:%M:%S").timetuple()))
     es = episodes_df[episodes_df.index == epid]['EndTime'].values[0]
@@ -50,10 +52,10 @@ def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, jso
         }
         
         agents.append(agent)
-    current_competition = json_config["Competitions_Info"]["TARGET_COMP"]
+    
     info = {
         "id": int(epid),
-        "competitionId": int(json_config["Competitions_Info"]["COMP_IDS"][current_competition]),
+        "competitionId": config_handler.target_competition_id,
         "createTime": {
             "seconds": int(create_seconds)
         },
@@ -67,23 +69,23 @@ def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, jso
 
 
 
-def saveEpisode(epid, episode_agents_df, conf, episodes_df):
+def saveEpisode(epid, episode_agents_df, config_handler:Config_Handler, episodes_df):
     # request
-    re = requests.post(conf["URL"], json = {"EpisodeId": int(epid)})
-    match_replay_path = os.path.join(conf["DIRECTORIES"]["MATCHES"],'{}.json'.format(epid))
-    match_info_path = os.path.join(conf["DIRECTORIES"]["MATCHES"],'{}_info.json'.format(epid))
+    re = requests.post(config_handler.url, json = {"EpisodeId": int(epid)})
+    match_replay_path = os.path.join(config_handler.get_directory("MATCHES"),'{}.json'.format(epid))
+    match_info_path = os.path.join(config_handler.get_directory("MATCHES"),'{}_info.json'.format(epid))
     # save replay
     with open(match_replay_path, 'w') as f:
         f.write(re.json()['result']['replay'])
 
     # save match info
-    info = create_info_json(epid, episode_agents_df, episodes_df, conf)
+    info = create_info_json(epid, episode_agents_df, episodes_df, config_handler)
     with open(match_info_path, 'w') as f:
         json.dump(info, f)
 
-def check_for_new_eps(candidates, sub_to_episodes, conf):
+def check_for_new_eps(candidates, sub_to_episodes, matches_dir:str):
     all_files = []
-    for root, dirs, files in os.walk(conf["DIRECTORIES"]["MATCHES"], topdown=False):
+    for root, dirs, files in os.walk(matches_dir, topdown=False):
         print(root, dirs, files)
         
         all_files.extend(files)
@@ -96,33 +98,33 @@ def check_for_new_eps(candidates, sub_to_episodes, conf):
     return already_scraped, remaining
 
 
-def start_scraping(episodes, episode_pagents_df, seen, remaining, sub_to_score_top, sub_to_episodes, conf):
+def start_scraping(episodes, episode_pagents_df, seen, remaining, sub_to_score_top, sub_to_episodes, config_handler:Config_Handler):
     print("Will request available data for the current chunk...")
     total_calls = 0
 
     start_time = datetime.datetime.now()
     se=0
     for key, value in sorted(sub_to_score_top.items(), key=lambda kv: kv[1], reverse=True):
-        if total_calls<=conf["THRESHOLDS"]["MAX_REQUESTS"]:
+        if total_calls<=config_handler.get_threshold("MAX_REQUESTS"):
             print('')
             remaining = sorted(np.setdiff1d(sub_to_episodes[key],seen), reverse=True)
             print(f'submission={key}, LB={"{:.0f}".format(value)}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
             
             for epid in remaining:
-                if epid not in seen and total_calls<=conf["THRESHOLDS"]["MAX_REQUESTS"]:
+                if epid not in seen and total_calls<=config_handler.get_threshold("MAX_REQUESTS"):
                    
-                    saveEpisode(epid, episode_pagents_df, conf, episodes) 
+                    saveEpisode(epid, episode_pagents_df, config_handler, episodes) 
                     
                     se+=1
                     try:
-                        size = os.path.getsize(conf["DIRECTORIES"]["MATCHES"]+'{}.json'.format(epid)) / 1e6
+                        size = os.path.getsize(config_handler.get_directory("MATCHES")+'{}.json'.format(epid)) / 1e6
                         print(str(total_calls) + f': saved episode #{epid}')
                         seen.append(epid)
                         total_calls+=1
                     except:
                         print('  file {}.json did not seem to save'.format(epid))    
-                    time.sleep(conf["THRESHOLDS"]["REQUEST_INTERVAL"])
-                if total_calls>(min(3600,conf["THRESHOLDS"]["MAX_REQUESTS"])):
+                    time.sleep(config_handler.get_threshold("REQUEST_INTERVAL"))
+                if total_calls>(min(3600,config_handler.get_threshold("MAX_REQUESTS"))):
                     break
     
     print(f'\nEpisodes saved: {se}')
