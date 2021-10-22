@@ -64,8 +64,6 @@ else:
         sub_to_episodes = collections.defaultdict(list)
         candidates = get_candidate_eps(sub_to_score_top=sub_to_score_top, sub_to_episodes=sub_to_episodes, epagents_df=chunk)
         seen_episodes, remaining = check_for_new_eps(candidates, sub_to_episodes, conf_json)
-        
-        
         start_scraping(episodes_df, chunk, seen_episodes, remaining, sub_to_score_top, sub_to_episodes, conf_json)
-        
+
 
