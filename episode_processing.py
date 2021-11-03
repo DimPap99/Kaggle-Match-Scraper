@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from pandas.core.frame import DataFrame
-import datetime, collections
-import time, requests, json, os, sys
+import datetime
+import time, requests, json, os
 from Config_Handler import Config_Handler
 def filter_AgentEps(episode_agents:DataFrame, episodes:DataFrame, score_threshold):
     #filter the dataframes
@@ -30,13 +30,13 @@ def get_candidate_eps(subid_and_score_pairs:dict, subid_epid_pairs:dict, episode
 
 def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, config_handler:Config_Handler):
     ct = episodes_df[episodes_df.index == epid]['CreateTime'].values[0]
-    create_seconds = int(time.mktime(datetime.datetime.strptime(ct, "%Y/%m/%d %H:%M:%S").timetuple()))
+    create_seconds = int(time.mktime(datetime.datetime.strptime(ct, "%Y-%m-%d %H:%M:%S").timetuple()))
     es = episodes_df[episodes_df.index == epid]['EndTime'].values[0]
-    end_seconds = int(time.mktime(datetime.datetime.strptime(es, "%Y/%m/%d %H:%M:%S").timetuple()))
+    end_seconds = int(time.mktime(datetime.datetime.strptime(es, "%Y-%m-%d %H:%M:%S").timetuple()))
 
     agents = []
     for index, row in epagents_df[epagents_df['EpisodeId'] == epid].sort_values(by=['Index']).iterrows():
-        print(epagents_df.columns)
+        
         agent = {
             "id": int(row["Id"]),
             "state": int(row["State"]),
@@ -49,7 +49,6 @@ def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, con
             "updatedConfidence": float(row['UpdatedConfidence']),
             "teamId": int(0)
         }
-        
         agents.append(agent)
     
     info = {
@@ -71,17 +70,15 @@ def create_info_json(epid:int, epagents_df:DataFrame, episodes_df:DataFrame, con
 def saveEpisode(epid, episode_agents_df, config_handler:Config_Handler, episodes_df):
     # request
     re = requests.post(config_handler.url, json = {"EpisodeId": int(epid)})
+    
+    
     match_replay_path = os.path.join(config_handler.get_directory("MATCHES"),'{}.json'.format(epid))
-    match_all_path = os.path.join(config_handler.get_directory("MATCHES"),'all{}.json'.format(epid))
-
     match_info_path = os.path.join(config_handler.get_directory("MATCHES"),'{}_info.json'.format(epid))
     # save replay
     with open(match_replay_path, 'w') as f:
         f.write(re.json()['result']['replay'])
 
-    with open(match_all_path, 'w') as f:
-        f.write(re.json())
-    # save match info
+    
     info = create_info_json(epid, episode_agents_df, episodes_df, config_handler)
     with open(match_info_path, 'w') as f:
         json.dump(info, f)
@@ -89,71 +86,47 @@ def saveEpisode(epid, episode_agents_df, config_handler:Config_Handler, episodes
 def check_for_new_eps(candidates, subid_epid_pairs, matches_dir:str):
     all_files = []
     for root, dirs, files in os.walk(matches_dir, topdown=False):
-        print(root, dirs, files)
-        
         all_files.extend(files)
     
-    seen_episodes = [int(f.split('.')[0]) for f in all_files 
+    existing_eps = [int(f.split('.')[0]) for f in all_files 
                         if '.' in f and f.split('.')[0].isdigit() and f.split('.')[1] == 'json']
-    remaining = np.setdiff1d([item for sublist in subid_epid_pairs.values() for item in sublist],seen_episodes)
+    remaining = np.setdiff1d([item for sublist in subid_epid_pairs.values() for item in sublist],existing_eps)
     
     print(f'{len(remaining)} of these {candidates} episodes not yet saved')
-    print('Total of {} games in existing library'.format(len(seen_episodes)))
-    return seen_episodes, remaining
+    print('Total of {} games in existing library'.format(len(existing_eps)))
+    return existing_eps, remaining
 
     
-    #     if '_info' in file_name:
-    #         continue
-    #     else:
-    #         existing_epids.append(int(file_name.split(".")[0]))
-    # sub = []
-    # for submissio_id, episode_id in subid_epid_pairs.items():
-    # for key in subid_epid_pairs:
-    #     sub.extend(subid_epid_pairs[key])
-    # print(list(set(sub[0:len(sub)//2]).intersection(sub[(len(sub)//2):-1])))
-
-    
-    #print([item for item, count in collections.Counter(sub).items() if count > 1])
-
-    #total_epids
-    # for item in sub_to_episodes:
-    #     print(item)
-    #print(sub_to_episodes)
-    sys.exit(0)
-    remaining = np.setdiff1d([item for sublist in subid_epid_pairs.values() for item in sublist],existing_epids)
-    print(remaining)
-    print(f'{len(remaining)} of these {candidates} episodes not yet saved')
-    print('Total of {} games in existing library'.format(len(existing_epids)))
-    return existing_epids, remaining
 
 
 def start_scraping(episodes, episode_pagents_df, seen, remaining, sub_to_score_top, sub_to_episodes, config_handler:Config_Handler):
     print("Will request available data for the current chunk...")
     total_calls = 0
-
-    start_time = datetime.datetime.now()
-    se=0
+    saved_eps=0
     for key, value in sorted(sub_to_score_top.items(), key=lambda kv: kv[1], reverse=True):
         if total_calls<=config_handler.get_threshold("MAX_REQUESTS"):
             print('')
             remaining = sorted(np.setdiff1d(sub_to_episodes[key],seen), reverse=True)
             print(f'submission={key}, LB={"{:.0f}".format(value)}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
-            
             for epid in remaining:
                 if epid not in seen and total_calls<=config_handler.get_threshold("MAX_REQUESTS"):
                    
                     saveEpisode(epid, episode_pagents_df, config_handler, episodes) 
                     
-                    se+=1
-                    try:
-                        size = os.path.getsize(config_handler.get_directory("MATCHES")+'{}.json'.format(epid)) / 1e6
-                        print(str(total_calls) + f': saved episode #{epid}')
+                    
+                    saved_file_path = os.path.join(config_handler.get_directory("MATCHES"), '{}.json'.format(epid))
+                    if os.path.exists(saved_file_path):
+                        print(f"Request {str(total_calls)} : saved episode #{epid}")
                         seen.append(epid)
                         total_calls+=1
-                    except:
-                        print('  file {}.json did not seem to save'.format(epid))    
+                        saved_eps+=1
+                    else:
+                        print(f'The file {epid}.json was not saved')
+                        raise FileNotFoundError   
+                     
                     time.sleep(config_handler.get_threshold("REQUEST_INTERVAL"))
-                if total_calls>(min(3600,config_handler.get_threshold("MAX_REQUESTS"))):
+                if total_calls> config_handler.get_threshold("MAX_REQUESTS"):
+                    print("Total amount of daily requests has been surpassed...")
                     break
     
-    print(f'\nEpisodes saved: {se}')
+    print(f'\nEpisodes saved: {saved_eps}')
