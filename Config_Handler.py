@@ -61,10 +61,6 @@ class Config_Handler(object):
 
             "COMP_IDS": {
                 'lux-ai-2021': 30067,
-                'hungry-geese': 25401,
-                'rock-paper-scissors': 22838,
-                'santa-2020': 24539,
-                'halite': 18011,
                 'google-football': 21723
             },
             "TARGET_COMP": 'lux-ai-2021'
